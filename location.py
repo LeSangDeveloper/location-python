@@ -1,3 +1,43 @@
+import inspect
+
+
+def auto_repr(cls):
+    members = vars(cls)
+
+    if "__repr__" in members:
+        raise TypeError(f"{cls.__name__} already defines __repr__")
+
+    if "__init__" not in members:
+        raise TypeError(f"{cls.__name__} does not override __init__")
+
+    sig = inspect.signature(cls.__init__)
+    parameters_name = list(sig.parameters)[1:]
+
+    if not all(
+        isinstance(members.get(name, None),property)
+        for name in parameters_name
+    ):
+        raise TypeError(f"Cannot apply auto_repr to {cls.__name__} because not all"
+                        f"__init__ parameters matching all properties"
+                        )
+
+    def synthesized_repr(self):
+        return "{typename}({args})".format(
+            typename = typename(self),
+            args=".".join(
+                "{name}={value!r}".format(
+                    name=name,
+                    value=getattr(name)
+                ) for name in parameters_name
+            )
+        )
+
+    setattr(cls, "__repr__", synthesized_repr)
+
+    return cls
+
+
+@auto_repr
 class Position:
 
     def __init__(self, latitude, longitude):
@@ -24,9 +64,6 @@ class Position:
 
     def longitude_hemisphere(self):
         return "E" if self.longitude > 0 else "W"
-
-    def __repr__(self):
-        return f"{typename(self)}(latitude={self.latitude}, longitude={self.longitude})"
 
     def __str__(self):
         return (
